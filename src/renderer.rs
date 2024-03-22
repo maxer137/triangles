@@ -29,9 +29,9 @@ pub const SIZE: f32 = 5.0;
 pub fn model(_app: &App) -> Model {
     let mut t = Tree::empty();
     for i in 0..10 {
-        t.add_node(TreesEnum::First, Node::from_pos(0.0, (i * 10) as f32));
-        t.add_node(TreesEnum::Second, Node::from_pos(0.0, -(i * 10) as f32));
-        t.add_node(TreesEnum::Third, Node::from_pos((i * 10) as f32, -(i * 10) as f32));
+        t.add_node(TreesEnum::First, Node::from_pos(-10.0, (i * 10) as f32));
+        t.add_node(TreesEnum::Second, Node::from_pos(-10.0, -10.0 -(i * 10) as f32));
+        t.add_node(TreesEnum::Third, Node::from_pos(10.0 + (i * 10) as f32, -(i * 10) as f32));
     }
     t.add_node(TreesEnum::Second, Node::from_pos(-250.0, -300.0));
     t.add_node(TreesEnum::Third, Node::from_pos(250.0, -300.0));
@@ -100,13 +100,9 @@ pub fn render_triangle(app: &App, model: &Model) {
     draw.line().end((tree.tree2.last().unwrap().pos + cam_pos) * scale).start((tree.tree3.last().unwrap().pos + cam_pos) * scale).color(GRAY);
     draw.line().end((tree.tree3.last().unwrap().pos + cam_pos) * scale).start((tree.tree1.last().unwrap().pos + cam_pos) * scale).color(GRAY);
 
-    for tree_branch in TreesEnum::iterator() {
-        draw.line().end((tree[*tree_branch].first().unwrap().pos + cam_pos) * scale).start((tree.center.pos + cam_pos) * scale).color(GRAY);
-        //Draw the lines between nodes
-        for i in 0..tree[*tree_branch].len() - 1 {
-            // Print the current element and the next element
-            draw.line().end((tree[*tree_branch][i].pos + cam_pos) * scale).start((tree[*tree_branch][i + 1].pos + cam_pos) * scale).color(GRAY);
-        }
+    //Draw edges
+    for e in tree.get_all_edges() {
+        draw.line().end((e.0 + cam_pos) * scale).start((e.1 + cam_pos) * scale).color(GRAY);
     }
 
     //Draw all the nodes
@@ -116,17 +112,38 @@ pub fn render_triangle(app: &App, model: &Model) {
                     TreesEnum::First => { BLUE }
                     TreesEnum::Second => { GREEN }
                     TreesEnum::Third => { RED }
-                    TreesEnum::Center => {GRAY}
+                    TreesEnum::Center => { GRAY }
                 }
             ).radius(SIZE);
     }
 
     if let Some(index) = model.selected {
+        draw_vis_edges(&draw, model, index);
         draw.ellipse().xy((tree[index].pos + cam_pos) * scale).color(WHITE).radius(SIZE);
     };
+    
+    draw_node_list(&draw, model, tree.find_special_nodes(), DARKCYAN);
+}
 
-    //Draw center for triangle
-    draw.ellipse().xy((tree.center.pos + cam_pos) * scale).color(GRAY).radius(SIZE);
+fn draw_node_list(draw: &Draw, model: &Model, list: Vec<TreeIndex>, color: Srgb<u8>) {
+    let tree = &model.tree;
+    let cam_pos = model.camera;
+    let scale = model.scale as f32;
+    for index in list {
+        draw.ellipse().xy((tree[index].pos + cam_pos) * scale).color(
+            color
+        ).radius(SIZE);
+    }
+}
+
+fn draw_vis_edges(draw: &Draw, model: &Model, index: TreeIndex) {
+    let tree = &model.tree;
+    let cam_pos = model.camera;
+    let scale = model.scale as f32;
+    let edges = tree.check_node_vis(index);
+    for edge in edges {
+        draw.line().end((tree[index].pos + cam_pos) * scale).start((tree[edge].pos + cam_pos) * scale).color(PURPLE);
+    }
 }
 
 pub fn view(app: &App, model: &Model, frame: Frame) {
