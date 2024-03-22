@@ -2,6 +2,7 @@ use std::ops::{Index, IndexMut};
 use nannou::geom::Point2;
 use crate::node::Node;
 use std::slice::Iter;
+use std::vec::IntoIter;
 
 pub struct Tree {
     pub center: Node,
@@ -10,17 +11,18 @@ pub struct Tree {
     pub tree3: Vec<Node>,
 }
 
-pub struct TreeIndex(TreesEnum, usize);
+#[derive(Clone, Copy)]
+pub struct TreeIndex(pub TreesEnum, pub usize);
 
 impl Tree {
-    pub fn iter(&self) -> Iter<'static, TreeIndex> {
+    pub fn iter(&self) -> IntoIter<TreeIndex> {
         let mut output = vec![TreeIndex(TreesEnum::Center, 0)];
         for branch in TreesEnum::iterator() {
             for i in 0..self[*branch].len() {
                 output.push(TreeIndex(*branch, i))
             }
         }
-        output.iter()
+        output.into_iter()
     }
 }
 
@@ -28,12 +30,18 @@ impl Tree {
 impl Index<TreeIndex> for Tree {
     type Output = Node;
     fn index(&self, index: TreeIndex) -> &Self::Output {
+        if let TreesEnum::Center = index.0 {
+            return &self.center
+        }
         &self[index.0][index.1]
     }
 }
 
 impl IndexMut<TreeIndex> for Tree {
     fn index_mut(&mut self, index: TreeIndex) -> &mut Self::Output {
+        if let TreesEnum::Center = index.0 {
+            return &mut self.center
+        }
         &mut self[index.0][index.1]
     }
 }
@@ -61,7 +69,7 @@ impl Index<TreesEnum> for Tree {
             TreesEnum::First => { &self.tree1 }
             TreesEnum::Second => { &self.tree2 }
             TreesEnum::Third => { &self.tree3 }
-            _ => { &vec![] }
+            _ => { &self.tree1 }
         }
     }
 }
@@ -72,7 +80,7 @@ impl IndexMut<TreesEnum> for Tree {
             TreesEnum::First => { &mut self.tree1 }
             TreesEnum::Second => { &mut self.tree2 }
             TreesEnum::Third => { &mut self.tree3 }
-            _ => { &mut vec![] }
+            _ => { &mut self.tree1 }
         }
     }
 }
@@ -86,14 +94,12 @@ impl Tree {
             tree3: vec![],
         }
     }
-    pub fn find_node_at_pos(&self, pos: Point2, scale: f32) -> Option<(TreesEnum, usize)> {
-        for tree in TreesEnum::iterator() {
-            for (index, node) in self[*tree].iter().enumerate() {
-                let dist = node.pos.distance(pos);
-                if dist < scale {
-                    return Some((*tree, index));
-                }
-            };
+    pub fn find_node_at_pos(&self, pos: Point2, scale: f32) -> Option<TreeIndex> {
+        for index in self.iter() {
+            let dist = self[index].pos.distance(pos);
+            if dist < scale {
+                return Some(index);
+            }
         }
         None
     }

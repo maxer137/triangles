@@ -1,13 +1,13 @@
 use nannou::prelude::*;
 use nannou::winit::event::DeviceEvent;
 use crate::node::Node;
-use crate::tree::{Tree, TreesEnum};
+use crate::tree::{Tree, TreeIndex, TreesEnum};
 
 pub struct Model {
     tree: Tree,
     camera: Point2,
     scale: f64,
-    selected: Option<(TreesEnum, usize)>,
+    selected: Option<TreeIndex>,
     click: Point2,
     render_options: RenderOptions,
 }
@@ -73,12 +73,8 @@ pub fn event(app: &App, model: &mut Model, event: Event) {
                     model.camera.y -= (delta.1 / model.scale) as f32;
                 }
                 if app.mouse.buttons.left().is_down() {
-                    if let Some((tree, index)) = &model.selected {
-                        match tree {
-                            TreesEnum::First => { model.tree.tree1[*index].pos += vec2((delta.0 / model.scale) as f32, -(delta.1 / model.scale) as f32) }
-                            TreesEnum::Second => { model.tree.tree2[*index].pos += vec2((delta.0 / model.scale) as f32, -(delta.1 / model.scale) as f32) }
-                            TreesEnum::Third => { model.tree.tree3[*index].pos += vec2((delta.0 / model.scale) as f32, -(delta.1 / model.scale) as f32) }
-                        }
+                    if let Some(index) = &model.selected {
+                        model.tree[*index].pos += vec2((delta.0 / model.scale) as f32, -(delta.1 / model.scale) as f32)
                     }
                 }
             }
@@ -105,7 +101,7 @@ pub fn render_triangle(app: &App, model: &Model) {
     draw.line().end((tree.tree3.last().unwrap().pos + cam_pos) * scale).start((tree.tree1.last().unwrap().pos + cam_pos) * scale).color(GRAY);
 
     for tree_branch in TreesEnum::iterator() {
-        draw.line().end((tree[*tree_branch].first().unwrap().pos + cam_pos) * scale).start((tree.pos + cam_pos) * scale).color(GRAY);
+        draw.line().end((tree[*tree_branch].first().unwrap().pos + cam_pos) * scale).start((tree.center.pos + cam_pos) * scale).color(GRAY);
         //Draw the lines between nodes
         for i in 0..tree[*tree_branch].len() - 1 {
             // Print the current element and the next element
@@ -114,24 +110,23 @@ pub fn render_triangle(app: &App, model: &Model) {
     }
 
     //Draw all the nodes
-    for tree_branch in TreesEnum::iterator() {
-        for node in &tree[*tree_branch] {
-            draw.ellipse().xy((node.pos + cam_pos) * scale).color(
-                match tree_branch {
+    for index in tree.iter() {
+            draw.ellipse().xy((tree[index].pos + cam_pos) * scale).color(
+                match index.0 {
                     TreesEnum::First => { BLUE }
                     TreesEnum::Second => { GREEN }
                     TreesEnum::Third => { RED }
+                    TreesEnum::Center => {GRAY}
                 }
             ).radius(SIZE);
-        }
     }
 
-    if let Some((select, index)) = &model.selected {
-        draw.ellipse().xy((tree[*select][*index].pos + cam_pos) * scale).color(WHITE).radius(SIZE);
+    if let Some(index) = model.selected {
+        draw.ellipse().xy((tree[index].pos + cam_pos) * scale).color(WHITE).radius(SIZE);
     };
 
     //Draw center for triangle
-    draw.ellipse().xy((tree.pos + cam_pos) * scale).color(GRAY).radius(SIZE);
+    draw.ellipse().xy((tree.center.pos + cam_pos) * scale).color(GRAY).radius(SIZE);
 }
 
 pub fn view(app: &App, model: &Model, frame: Frame) {
