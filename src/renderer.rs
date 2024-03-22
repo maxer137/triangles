@@ -9,6 +9,19 @@ pub struct Model {
     scale: f64,
     selected: Option<(TreesEnum, usize)>,
     click: Point2,
+    render_options: RenderOptions,
+}
+
+pub struct RenderOptions {
+    show_path: bool,
+}
+
+impl RenderOptions {
+    fn default() -> Self {
+        Self {
+            show_path: false
+        }
+    }
 }
 
 pub const SIZE: f32 = 5.0;
@@ -22,7 +35,14 @@ pub fn model(_app: &App) -> Model {
     }
     t.add_node(TreesEnum::Second, Node::from_pos(-250.0, -300.0));
     t.add_node(TreesEnum::Third, Node::from_pos(250.0, -300.0));
-    Model { tree: t, camera: Point2::new(0.0, 200.0), scale: 1.0, selected: None, click: (0.0, 0.0).into() }
+    Model {
+        tree: t,
+        camera: Point2::new(0.0, 200.0),
+        scale: 1.0,
+        selected: None,
+        click: (0.0, 0.0).into(),
+        render_options: RenderOptions::default(),
+    }
 }
 
 pub fn event(app: &App, model: &mut Model, event: Event) {
@@ -32,15 +52,13 @@ pub fn event(app: &App, model: &mut Model, event: Event) {
                 return;
             }
             match simple.unwrap() {
-                MousePressed(but) => {
-                    if let MouseButton::Left = but {
-                        let data = Point2::new(
-                            app.mouse.position().x / model.scale as f32,
-                            app.mouse.position().y / model.scale as f32)
-                            - model.camera;
-                        model.click = data;
-                        model.selected = model.tree.find_node_at_pos(data, SIZE / model.scale as f32);
-                    }
+                MousePressed(MouseButton::Left) => {
+                    let data = Point2::new(
+                        app.mouse.position().x / model.scale as f32,
+                        app.mouse.position().y / model.scale as f32)
+                        - model.camera;
+                    model.click = data;
+                    model.selected = model.tree.find_node_at_pos(data, SIZE / model.scale as f32);
                 }
                 MouseReleased(_) => {
                     model.selected = None;
@@ -64,10 +82,8 @@ pub fn event(app: &App, model: &mut Model, event: Event) {
                     }
                 }
             }
-            if let DeviceEvent::MouseWheel { delta } = data {
-                if let MouseScrollDelta::LineDelta(_x, y) = delta {
-                    model.scale += -1.0 * f64::max(-1.0, f64::min(1.0, *y as f64)) * 0.5 * model.scale;
-                }
+            if let DeviceEvent::MouseWheel { delta: MouseScrollDelta::LineDelta(_x, y) } = data {
+                model.scale += -1.0 * f64::max(-1.0, f64::min(1.0, *y as f64)) * 0.5 * model.scale;
             }
         }
         Event::Update(_) => {}
@@ -87,7 +103,7 @@ pub fn render_triangle(app: &App, model: &Model) {
     draw.line().end((tree.tree1.last().unwrap().pos + cam_pos) * scale).start((tree.tree2.last().unwrap().pos + cam_pos) * scale).color(GRAY);
     draw.line().end((tree.tree2.last().unwrap().pos + cam_pos) * scale).start((tree.tree3.last().unwrap().pos + cam_pos) * scale).color(GRAY);
     draw.line().end((tree.tree3.last().unwrap().pos + cam_pos) * scale).start((tree.tree1.last().unwrap().pos + cam_pos) * scale).color(GRAY);
-    
+
     for tree_branch in TreesEnum::iterator() {
         draw.line().end((tree[*tree_branch].first().unwrap().pos + cam_pos) * scale).start((tree.pos + cam_pos) * scale).color(GRAY);
         //Draw the lines between nodes
