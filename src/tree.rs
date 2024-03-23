@@ -1,42 +1,10 @@
 use std::ops::{Index, IndexMut};
 use nannou::geom::Point2;
 use crate::node::Node;
-use std::slice::Iter;
 use std::vec::IntoIter;
-use nannou::geom::rect::NUM_TRIANGLES;
-use nannou::prelude::abs;
-
-#[derive(Copy, Clone)]
-pub struct Edge(pub Point2, pub Point2);
-
-impl Edge {
-    pub fn intersects(&self, e: Edge) -> bool {
-        let p = self.0;
-        let q = e.0;
-        let r = Point2::new(self.1.x - self.0.x, self.1.y - self.0.y);
-        let s = Point2::new(e.1.x - e.0.x, e.1.y - e.0.y);
-        let r_cross_s = r.x * s.y - r.y * s.x;
-        let q_minus_p = Point2::new(q.x - p.x, q.y - p.y);
-        let q_minus_p_cross_r = q_minus_p.x * r.y - q_minus_p.y * r.x;
-
-        if r_cross_s == 0.0 {
-            // Parallel lines
-            if q_minus_p_cross_r == 0.0 {
-                // Collinear lines
-                let t0 = (q.x - p.x) / r.x;
-                let t1 = (q.y - p.y) / r.y;
-                // Check if the ranges of t overlap
-                return (0.0..=1.0).contains(&t0) || (0.0..=1.0).contains(&t1);
-            }
-            return false;
-        }
-
-        let t = (q_minus_p_cross_r) / r_cross_s;
-        let u = (q_minus_p.x * s.y - q_minus_p.y * s.x) / r_cross_s;
-
-        t >= 0.0 && t <= 1.0 && u >= 0.0 && u <= 1.0
-    }
-}
+use crate::edge::Edge;
+use crate::tree_enum::TreesEnum;
+use crate::tree_index::TreeIndex;
 
 
 pub struct Tree {
@@ -46,27 +14,7 @@ pub struct Tree {
     pub tree3: Vec<Node>,
 }
 
-
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub struct TreeIndex(pub TreesEnum, pub usize);
-
-impl TreeIndex {
-    pub fn same_color(&self, other: Self) -> bool {
-        self.0 == other.0 || self.0 == TreesEnum::Center || other.0 == TreesEnum::Center
-    }
-    
-    pub fn makes_triangle(&self, c2: Self, c3: Self) -> Triangle {
-        if self.same_color(c2) && c2.same_color(c3) && c3.same_color(*self) {
-            Triangle::AllSame
-        } else if self.0 == c2.0 || c2.0 == c3.0 || c3.0 == self.0 {
-            Triangle::OneOdd
-        } else {
-            Triangle::Illegal
-        }
-    }
-}
-
-enum Triangle {
+pub enum Triangle {
     AllSame,
     OneOdd,
     Illegal
@@ -101,21 +49,6 @@ impl IndexMut<TreeIndex> for Tree {
             return &mut self.center;
         }
         &mut self[index.0][index.1]
-    }
-}
-
-#[derive(Copy, Clone, PartialOrd, PartialEq, Debug)]
-pub enum TreesEnum {
-    Center,
-    First,
-    Second,
-    Third,
-}
-
-impl TreesEnum {
-    pub fn iterator() -> Iter<'static, TreesEnum> {
-        static DIRECTIONS: [TreesEnum; 3] = [TreesEnum::First, TreesEnum::Second, TreesEnum::Third];
-        DIRECTIONS.iter()
     }
 }
 
@@ -195,18 +128,27 @@ impl Tree {
     }
 
     pub fn find_cycle(&self, length: usize) -> Result<Vec<TreeIndex>, ()> {
+        //Get the basic start cycle
         let mut cycle = self.start_cycle();
-        let mut strict = true;
+        //Set to first pickup low visibility nodes
+        let mut special_pass = true;
+        let specials = self.find_special_nodes();
+        
+        //Strict pass
+        let mut strict = false;
         'strict: while cycle.len() != length {
             let prev = cycle.len();
             let n = cycle.len();
             'cycle: for (prev, next) in (0..n).zip((0..n).cycle().skip(1)) {
-                if !cycle[prev].same_color(cycle[next]) && strict {
+                if !cycle[prev].same_color(cycle[next]) && strict || special_pass {
                     continue 'cycle;
                 }
                 let visible = self.check_node_vis_cycle(cycle[prev], &cycle);
                 'inner: for visible_node in visible {
-                    match visible_node.makes_triangle(cycle[next], cycle[prev]) {
+                    if special_pass && !specials.contains(&visible_node) {
+                        continue 'inner;
+                    }
+                    match visible_node.makes_triangle((cycle[next], cycle[prev])) {
                         Triangle::AllSame => {}
                         Triangle::OneOdd => {
                             if strict {
@@ -228,8 +170,16 @@ impl Tree {
                 }
             }
             if cycle.len() == prev {
-                strict = false;
-                continue 'strict;
+                if special_pass {
+                    special_pass = false;
+                    strict = true;
+                    continue 'strict;
+                } else if strict {
+                    strict = false;
+                    continue 'strict;
+                } else {
+                    return Err(());
+                }
             }
         }
         Ok(cycle)

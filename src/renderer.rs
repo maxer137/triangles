@@ -1,8 +1,9 @@
 use nannou::prelude::*;
 use nannou::winit::dpi::PhysicalPosition;
 use nannou::winit::event::DeviceEvent;
-use crate::node::Node;
-use crate::tree::{Tree, TreeIndex, TreesEnum};
+use crate::tree::Tree;
+use crate::tree_enum::TreesEnum;
+use crate::tree_index::TreeIndex;
 
 pub struct Model {
     pub tree: Tree,
@@ -49,8 +50,16 @@ pub fn event(app: &App, model: &mut Model, event: Event) {
                 }
                 ReceivedCharacter(c) => {
                     match c {
-                        '+' => {model.cycle_len += 1}
-                        '-' => {model.cycle_len -= 1}
+                        '+' => {
+                            if model.cycle_len != model.tree.iter().len() {
+                                model.cycle_len += 1
+                            }
+                        }
+                        '-' => {
+                            if model.cycle_len != 4 {
+                                model.cycle_len -= 1
+                            }
+                        }
                         _ => {}
                     }
                 }
