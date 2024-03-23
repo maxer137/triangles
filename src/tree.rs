@@ -3,6 +3,8 @@ use nannou::geom::Point2;
 use crate::node::Node;
 use std::slice::Iter;
 use std::vec::IntoIter;
+use nannou::geom::rect::NUM_TRIANGLES;
+use nannou::prelude::abs;
 
 #[derive(Copy, Clone)]
 pub struct Edge(pub Point2, pub Point2);
@@ -47,6 +49,28 @@ pub struct Tree {
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct TreeIndex(pub TreesEnum, pub usize);
+
+impl TreeIndex {
+    pub fn same_color(&self, other: Self) -> bool {
+        self.0 == other.0 || self.0 == TreesEnum::Center || other.0 == TreesEnum::Center
+    }
+    
+    pub fn makes_triangle(&self, c2: Self, c3: Self) -> Triangle {
+        if self.same_color(c2) && c2.same_color(c3) && c3.same_color(*self) {
+            Triangle::AllSame
+        } else if self.0 == c2.0 || c2.0 == c3.0 || c3.0 == self.0 {
+            Triangle::OneOdd
+        } else {
+            Triangle::Illegal
+        }
+    }
+}
+
+enum Triangle {
+    AllSame,
+    OneOdd,
+    Illegal
+}
 
 impl Tree {
     pub fn iter(&self) -> IntoIter<TreeIndex> {
@@ -170,16 +194,73 @@ impl Tree {
         output
     }
 
+    pub fn find_cycle(&self, length: usize) -> Result<Vec<TreeIndex>, ()> {
+        let mut cycle = self.start_cycle();
+        let mut strict = true;
+        'strict: while cycle.len() != length {
+            let prev = cycle.len();
+            let n = cycle.len();
+            'cycle: for (prev, next) in (0..n).zip((0..n).cycle().skip(1)) {
+                if !cycle[prev].same_color(cycle[next]) && strict {
+                    continue 'cycle;
+                }
+                let visible = self.check_node_vis_cycle(cycle[prev], &cycle);
+                'inner: for visible_node in visible {
+                    match visible_node.makes_triangle(cycle[next], cycle[prev]) {
+                        Triangle::AllSame => {}
+                        Triangle::OneOdd => {
+                            if strict {
+                                continue 'inner;
+                            }
+                        }
+                        Triangle::Illegal => {
+                            continue 'inner;
+                        }
+                    }
+                    let other_vis = self.check_node_vis_cycle(cycle[next], &cycle);
+                    if cycle.contains(&visible_node) {
+                        continue 'inner;
+                    }
+                    if other_vis.contains(&visible_node) {
+                        cycle.insert(next, visible_node);
+                        break 'cycle;
+                    }
+                }
+            }
+            if cycle.len() == prev {
+                strict = false;
+                continue 'strict;
+            }
+        }
+        Ok(cycle)
+    }
 
-    pub fn check_node_vis(&self, node_index: TreeIndex) -> Vec<TreeIndex> {
+    pub fn start_cycle(&self) -> Vec<TreeIndex> {
+        let c = TreeIndex(TreesEnum::Center, 0);
+        let p1 = TreeIndex(TreesEnum::First, self.tree1.len()-1);
+        let p2 = TreeIndex(TreesEnum::Second, self.tree2.len()-1);
+        let p3 = TreeIndex(TreesEnum::Third, self.tree3.len()-1);
+        vec![c, p1, p2, p3]
+    }
+
+    pub fn check_node_vis_cycle(&self, node_index: TreeIndex, cycle: &[TreeIndex]) -> Vec<TreeIndex> {
+        let mut edges = vec![];
+        for i in 0..cycle.len() - 1 {
+            edges.push(Edge(self[cycle[i]].pos, self[cycle[i+1]].pos));
+        }
+        edges.push(Edge(self[*cycle.last().unwrap()].pos, self[*cycle.first().unwrap()].pos));
+        edges.append(&mut self.get_all_edges());
+        self.check_node_vis_from_edge(node_index, edges)
+    }
+
+    pub fn check_node_vis_from_edge(&self, node_index: TreeIndex, edges: Vec<Edge>) -> Vec<TreeIndex> {
         let mut output = vec![];
-        let all_edges = self.get_all_edges();
         'node: for index in self.iter() {
             if index == node_index {
                 continue 'node;
             }
             let new_edge = Edge(self[node_index].pos, self[index].pos);
-            'edge: for edge in &all_edges {
+            'edge: for edge in &edges {
                 if edge.0 == self[node_index].pos || edge.1 == self[node_index].pos {
                     continue 'edge;
                 }
@@ -193,5 +274,10 @@ impl Tree {
             output.push(index)
         }
         output
+    }
+
+    pub fn check_node_vis(&self, node_index: TreeIndex) -> Vec<TreeIndex> {
+        let all_edges = self.get_all_edges();
+        self.check_node_vis_from_edge(node_index, all_edges)
     }
 }

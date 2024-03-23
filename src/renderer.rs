@@ -1,4 +1,5 @@
 use nannou::prelude::*;
+use nannou::winit::dpi::PhysicalPosition;
 use nannou::winit::event::DeviceEvent;
 use crate::node::Node;
 use crate::tree::{Tree, TreeIndex, TreesEnum};
@@ -9,6 +10,7 @@ pub struct Model {
     pub scale: f64,
     pub selected: Option<TreeIndex>,
     pub click: Point2,
+    pub cycle_len: usize,
     pub render_options: RenderOptions,
 }
 
@@ -45,7 +47,14 @@ pub fn event(app: &App, model: &mut Model, event: Event) {
                 MouseReleased(_) => {
                     model.selected = None;
                 }
-                _ => {}
+                ReceivedCharacter(c) => {
+                    match c {
+                        '+' => {model.cycle_len += 1}
+                        '-' => {model.cycle_len -= 1}
+                        _ => {}
+                    }
+                }
+                _=>{}
             }
         }
         Event::DeviceEvent(_, ref data) => {
@@ -62,6 +71,14 @@ pub fn event(app: &App, model: &mut Model, event: Event) {
             }
             if let DeviceEvent::MouseWheel { delta: MouseScrollDelta::LineDelta(_x, y) } = data {
                 model.scale += -1.0 * f64::max(-1.0, f64::min(1.0, *y as f64)) * 0.5 * model.scale;
+            }
+            if let DeviceEvent::MouseWheel { delta: MouseScrollDelta::PixelDelta(PhysicalPosition{x,y})} = data {
+                if app.keys.mods.shift() {
+                    model.scale += -1.0 * f64::max(-1.0, f64::min(1.0, *y)) * 0.1 * model.scale;
+                } else {
+                    model.camera.x += (x / model.scale / 2.0) as f32;
+                    model.camera.y -= (y / model.scale / 2.0) as f32;
+                }
             }
         }
         Event::Update(_) => {}
@@ -99,12 +116,28 @@ pub fn render_triangle(app: &App, model: &Model) {
             ).radius(SIZE);
     }
 
+    if let Ok(output) = tree.find_cycle(model.cycle_len) {
+        draw_cycle(&draw, model, output, PINK);
+    }
     if let Some(index) = model.selected {
         draw_vis_edges(&draw, model, index);
         draw.ellipse().xy((tree[index].pos + cam_pos) * scale).color(WHITE).radius(SIZE);
     };
 
     draw_node_list(&draw, model, tree.find_special_nodes(), DARKCYAN);
+}
+
+fn draw_cycle(draw: &Draw, model: &Model, list: Vec<TreeIndex>, color: Srgb<u8>) {
+    let tree = &model.tree;
+    let cam_pos = model.camera;
+    let scale = model.scale as f32;
+    for i in 0..list.len() - 1 {
+        // Print the current element and the next element
+        draw.text(&*i.to_string()).xy((tree[list[i]].pos + cam_pos) * scale);
+        draw.line().end((tree[list[i]].pos + cam_pos) * scale).start((tree[list[i+1]].pos + cam_pos) * scale).color(color);
+    }
+    draw.line().end((tree[list[0]].pos + cam_pos) * scale).start((tree[*list.last().unwrap()].pos + cam_pos) * scale).color(color);
+    // draw_node_list(draw, model, list, color);
 }
 
 fn draw_node_list(draw: &Draw, model: &Model, list: Vec<TreeIndex>, color: Srgb<u8>) {
@@ -122,9 +155,12 @@ fn draw_vis_edges(draw: &Draw, model: &Model, index: TreeIndex) {
     let tree = &model.tree;
     let cam_pos = model.camera;
     let scale = model.scale as f32;
-    let edges = tree.check_node_vis(index);
-    for edge in edges {
-        draw.line().end((tree[index].pos + cam_pos) * scale).start((tree[edge].pos + cam_pos) * scale).color(PURPLE);
+    if let Ok(cycle) = tree.find_cycle(model.cycle_len) {
+        let edges = tree.check_node_vis_cycle(index, &cycle);
+        // let edges = tree.check_node_vis(index);
+        for edge in edges {
+            draw.line().end((tree[index].pos + cam_pos) * scale).start((tree[edge].pos + cam_pos) * scale).color(PURPLE);
+        }
     }
 }
 
