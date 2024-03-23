@@ -23,13 +23,14 @@ pub fn model(_app: &App) -> Model {
         t.add_node(TreesEnum::Second, Node::from_pos(-dist - (i as f32 * dist) / SQRT_2, dist + (i as f32 * dist) / SQRT_2));
         t.add_node(TreesEnum::Third, Node::from_pos(dist + (i as f32 * dist) / SQRT_2, dist + (i as f32 * dist) / SQRT_2));
     }
+    let cycle_len = t.iter().len();
     Model {
         tree: t,
         camera: Point2::new(0.0, 200.0),
         scale: 1.0,
         selected: None,
         click: (0.0, 0.0).into(),
-        cycle_len: 5,
+        cycle_len,
         render_options: RenderOptions::default(),
     }
 }

@@ -28,6 +28,6 @@ impl Edge {
         let t = (q_minus_p_cross_r) / r_cross_s;
         let u = (q_minus_p.x * s.y - q_minus_p.y * s.x) / r_cross_s;
 
-        t >= 0.0 && t <= 1.0 && u >= 0.0 && u <= 1.0
+        (0.0..=1.0).contains(&t) && (0.0..=1.0).contains(&u)
     }
 }

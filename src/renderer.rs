@@ -50,6 +50,9 @@ pub fn event(app: &App, model: &mut Model, event: Event) {
                 }
                 ReceivedCharacter(c) => {
                     match c {
+                        'c' => {
+                            model.render_options.show_path = !model.render_options.show_path;
+                        }
                         '+' => {
                             if model.cycle_len != model.tree.iter().len() {
                                 model.cycle_len += 1
@@ -124,9 +127,10 @@ pub fn render_triangle(app: &App, model: &Model) {
                 }
             ).radius(SIZE);
     }
-
-    if let Ok(output) = tree.find_cycle(model.cycle_len) {
-        draw_cycle(&draw, model, output, PINK);
+    if model.render_options.show_path {
+        if let Ok(output) = tree.find_cycle(model.cycle_len) {
+            draw_cycle(&draw, model, output, PINK);
+        }
     }
     if let Some(index) = model.selected {
         draw_vis_edges(&draw, model, index);
@@ -142,7 +146,7 @@ fn draw_cycle(draw: &Draw, model: &Model, list: Vec<TreeIndex>, color: Srgb<u8>)
     let scale = model.scale as f32;
     for i in 0..list.len() - 1 {
         // Print the current element and the next element
-        draw.text(&*i.to_string()).xy((tree[list[i]].pos + cam_pos) * scale);
+        draw.text(&i.to_string()).xy((tree[list[i]].pos + cam_pos) * scale);
         draw.line().end((tree[list[i]].pos + cam_pos) * scale).start((tree[list[i+1]].pos + cam_pos) * scale).color(color);
     }
     draw.line().end((tree[list[0]].pos + cam_pos) * scale).start((tree[*list.last().unwrap()].pos + cam_pos) * scale).color(color);
@@ -165,8 +169,11 @@ fn draw_vis_edges(draw: &Draw, model: &Model, index: TreeIndex) {
     let cam_pos = model.camera;
     let scale = model.scale as f32;
     if let Ok(cycle) = tree.find_cycle(model.cycle_len) {
-        let edges = tree.check_node_vis_cycle(index, &cycle);
-        // let edges = tree.check_node_vis(index);
+        let edges = if model.render_options.show_path {
+            tree.check_node_vis_cycle(index, &cycle)
+        } else {
+            tree.check_node_vis(index)
+        };
         for edge in edges {
             draw.line().end((tree[index].pos + cam_pos) * scale).start((tree[edge].pos + cam_pos) * scale).color(PURPLE);
         }

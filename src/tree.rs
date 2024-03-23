@@ -222,7 +222,7 @@ impl Tree {
         output
     }
 
-    pub fn verify_valid_4th(&self, cycle: &Vec<TreeIndex>) -> bool {
+    pub fn verify_valid_4th(&self, cycle: &[TreeIndex]) -> bool {
         let edges: [Edge; 4] = [
             Edge(self[cycle[0]].pos, self[cycle[1]].pos),
             Edge(self[cycle[1]].pos, self[cycle[2]].pos),
@@ -248,22 +248,22 @@ impl Tree {
         output
     }
 
-    pub fn check_node_vis_cycle_org(&self, node_index: TreeIndex, cycle: &[TreeIndex]) -> Vec<TreeIndex> {
+    pub fn get_cycle_edges(&self, cycle: &[TreeIndex]) -> Vec<Edge> {
         let mut edges = vec![];
-        for i in 0..cycle.len() - 1 {
-            edges.push(Edge(self[cycle[i]].pos, self[cycle[i+1]].pos));
+        for (prev, next) in (0..cycle.len()).zip((0..cycle.len()).cycle().skip(1)) {
+            edges.push(Edge(self[cycle[prev]].pos, self[cycle[next]].pos));
         }
-        edges.push(Edge(self[*cycle.last().unwrap()].pos, self[*cycle.first().unwrap()].pos));
+        edges
+    }
+
+    pub fn check_node_vis_cycle_org(&self, node_index: TreeIndex, cycle: &[TreeIndex]) -> Vec<TreeIndex> {
+        let mut edges = self.get_cycle_edges(cycle);
         edges.append(&mut self.get_all_edges());
         self.check_node_vis_from_edge(node_index, edges)
     }
 
     pub fn check_node_vis_cycle(&self, node_index: TreeIndex, cycle: &[TreeIndex]) -> Vec<TreeIndex> {
-        let mut edges = vec![];
-        for i in 0..cycle.len() - 1 {
-            edges.push(Edge(self[cycle[i]].pos, self[cycle[i+1]].pos));
-        }
-        edges.push(Edge(self[*cycle.last().unwrap()].pos, self[*cycle.first().unwrap()].pos));
+        let edges = self.get_cycle_edges(cycle);
         self.check_node_vis_from_edge(node_index, edges)
     }
 
