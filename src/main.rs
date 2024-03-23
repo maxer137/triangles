@@ -16,7 +16,7 @@ use crate::tree::Tree;
 
 pub fn model(_app: &App) -> Model {
     let mut t = Tree::empty();
-    let total = 6;
+    let total = 1;
     for i in 0..total {
         let dist = 200.0 / total as f32;
         t.add_node(TreesEnum::First, Node::from_pos(0.0, -dist - (i as f32 * dist)));

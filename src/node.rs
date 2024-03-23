@@ -1,7 +1,7 @@
 use nannou::geom::Point2;
 
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct Node {
     pub pos: Point2,
 }

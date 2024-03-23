@@ -20,19 +20,6 @@ pub enum Triangle {
     Illegal
 }
 
-impl Tree {
-    pub fn iter(&self) -> IntoIter<TreeIndex> {
-        let mut output = vec![TreeIndex(TreesEnum::Center, 0)];
-        for branch in TreesEnum::iterator() {
-            for i in 0..self[*branch].len() {
-                output.push(TreeIndex(*branch, i))
-            }
-        }
-        output.into_iter()
-    }
-}
-
-
 impl Index<TreeIndex> for Tree {
     type Output = Node;
     fn index(&self, index: TreeIndex) -> &Self::Output {
@@ -85,6 +72,18 @@ impl Tree {
             tree3: vec![],
         }
     }
+
+
+    pub fn iter(&self) -> IntoIter<TreeIndex> {
+        let mut output = vec![TreeIndex(TreesEnum::Center, 0)];
+        for branch in TreesEnum::iterator() {
+            for i in 0..self[*branch].len() {
+                output.push(TreeIndex(*branch, i))
+            }
+        }
+        output.into_iter()
+    }
+    
     pub fn find_node_at_pos(&self, pos: Point2, scale: f32) -> Option<TreeIndex> {
         for index in self.iter() {
             let dist = self[index].pos.distance(pos);
@@ -97,6 +96,10 @@ impl Tree {
 
     pub fn add_node(&mut self, tree: TreesEnum, node: Node) {
         self[tree].push(node);
+    }
+
+    pub fn insert_node(&mut self, index: usize, tree: TreesEnum, node: Node) {
+        self[tree].insert(index, node);
     }
 
     pub fn get_all_edges(&self) -> Vec<Edge> {

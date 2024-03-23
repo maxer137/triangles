@@ -44,6 +44,17 @@ pub fn event(app: &App, model: &mut Model, event: Event) {
                         - model.camera;
                     model.click = data;
                     model.selected = model.tree.find_node_at_pos(data, SIZE / model.scale as f32);
+                },
+                MousePressed(MouseButton::Right) => {
+                    let data = Point2::new(
+                        app.mouse.position().x / model.scale as f32,
+                        app.mouse.position().y / model.scale as f32)
+                        - model.camera;
+                    model.click = data;
+                    if let Some(node)= model.tree.find_node_at_pos(data, SIZE / model.scale as f32) {
+                        model.tree.insert_node(node.1, node.0, model.tree[node]);
+                        model.selected = Some(node);
+                    }
                 }
                 MouseReleased(_) => {
                     model.selected = None;
@@ -76,6 +87,11 @@ pub fn event(app: &App, model: &mut Model, event: Event) {
                     model.camera.y -= (delta.1 / model.scale) as f32;
                 }
                 if app.mouse.buttons.left().is_down() {
+                    if let Some(index) = &model.selected {
+                        model.tree[*index].pos += vec2((delta.0 / model.scale) as f32, -(delta.1 / model.scale) as f32)
+                    }
+                }
+                if app.mouse.buttons.right().is_down() {
                     if let Some(index) = &model.selected {
                         model.tree[*index].pos += vec2((delta.0 / model.scale) as f32, -(delta.1 / model.scale) as f32)
                     }
@@ -168,15 +184,17 @@ fn draw_vis_edges(draw: &Draw, model: &Model, index: TreeIndex) {
     let tree = &model.tree;
     let cam_pos = model.camera;
     let scale = model.scale as f32;
-    if let Ok(cycle) = tree.find_cycle(model.cycle_len) {
-        let edges = if model.render_options.show_path {
+    let edges = if model.render_options.show_path {
+        if let Ok(cycle) = tree.find_cycle(model.cycle_len) {
             tree.check_node_vis_cycle(index, &cycle)
         } else {
-            tree.check_node_vis(index)
-        };
-        for edge in edges {
-            draw.line().end((tree[index].pos + cam_pos) * scale).start((tree[edge].pos + cam_pos) * scale).color(PURPLE);
+            vec![]
         }
+    } else {
+        tree.check_node_vis(index)
+    };
+    for edge in edges {
+        draw.line().end((tree[index].pos + cam_pos) * scale).start((tree[edge].pos + cam_pos) * scale).color(PURPLE);
     }
 }
 
