@@ -129,25 +129,21 @@ impl Tree {
 
     pub fn find_cycle(&self, length: usize) -> Result<Vec<TreeIndex>, ()> {
         //Get the basic start cycle
-        let mut cycle = self.start_cycle();
-        //Set to first pickup low visibility nodes
-        let mut special_pass = true;
-        let specials = self.find_special_nodes();
-        
+        let mut cycle = self.center_triangle();
+
         //Strict pass
-        let mut strict = false;
+        let mut strict = true;
         'strict: while cycle.len() != length {
-            let prev = cycle.len();
-            let n = cycle.len();
-            'cycle: for (prev, next) in (0..n).zip((0..n).cycle().skip(1)) {
-                if !cycle[prev].same_color(cycle[next]) && strict || special_pass {
+            let prev_length = cycle.len();
+            'cycle: for (prev, next) in (0..prev_length).zip((0..prev_length).cycle().skip(1)) {
+                // if this is the strict pass the edges must be of the same edge
+                if !cycle[prev].same_color(cycle[next]) && strict {
                     continue 'cycle;
                 }
-                let visible = self.check_node_vis_cycle(cycle[prev], &cycle);
+                // Get a list of all visible nodes from the first node
+                let visible = self.check_node_vis_cycle_org(cycle[prev], &cycle);
+                // For all of them
                 'inner: for visible_node in visible {
-                    if special_pass && !specials.contains(&visible_node) {
-                        continue 'inner;
-                    }
                     match visible_node.makes_triangle((cycle[next], cycle[prev])) {
                         Triangle::AllSame => {}
                         Triangle::OneOdd => {
@@ -159,7 +155,7 @@ impl Tree {
                             continue 'inner;
                         }
                     }
-                    let other_vis = self.check_node_vis_cycle(cycle[next], &cycle);
+                    let other_vis = self.check_node_vis_cycle_org(cycle[next], &cycle);
                     if cycle.contains(&visible_node) {
                         continue 'inner;
                     }
@@ -169,12 +165,8 @@ impl Tree {
                     }
                 }
             }
-            if cycle.len() == prev {
-                if special_pass {
-                    special_pass = false;
-                    strict = true;
-                    continue 'strict;
-                } else if strict {
+            if cycle.len() == prev_length {
+                if strict {
                     strict = false;
                     continue 'strict;
                 } else {
@@ -193,13 +185,85 @@ impl Tree {
         vec![c, p1, p2, p3]
     }
 
-    pub fn check_node_vis_cycle(&self, node_index: TreeIndex, cycle: &[TreeIndex]) -> Vec<TreeIndex> {
+    pub fn find_smallest_triangle(&self) -> Vec<TreeIndex> {
+        let mut all: Vec<TreeIndex> = self.check_node_vis(TreeIndex(TreesEnum::Center, 0));
+        all.sort_by(|a, b | self[*a].dist(&self.center).partial_cmp(&self[*b].dist(&self.center)).unwrap());
+        let mut output = vec![TreeIndex(TreesEnum::Center, 0)];
+        let (mut f, mut s,mut t) = (false, false, false);
+        for node in all {
+            match node.0 {
+                TreesEnum::Center => {}
+                TreesEnum::First => {
+                    if !f {
+                        f = true;
+                        output.push(node);
+                    }
+                }
+                TreesEnum::Second => {
+                    if !s {
+                        s = true;
+                        output.push(node);
+                    }}
+                TreesEnum::Third => {
+                    if !t {
+                        t = true;
+                        output.push(node);
+                    }}
+            }
+            if f && s && t {
+                break;
+            }
+        }
+        if !f || !s || !t {
+            output = vec![]
+        } else if self.verify_valid_4th(&output) {
+            output.swap(0, 1);
+        }
+        output
+    }
+
+    pub fn verify_valid_4th(&self, cycle: &Vec<TreeIndex>) -> bool {
+        let edges: [Edge; 4] = [
+            Edge(self[cycle[0]].pos, self[cycle[1]].pos),
+            Edge(self[cycle[1]].pos, self[cycle[2]].pos),
+            Edge(self[cycle[2]].pos, self[cycle[3]].pos),
+            Edge(self[cycle[3]].pos, self[cycle[0]].pos),
+        ];
+        !(edges[0].intersects(edges[2]) || edges[1].intersects(edges[3]))
+    }
+
+    pub fn center_triangle(&self) -> Vec<TreeIndex> {
+        let mut output = vec![
+            TreeIndex(TreesEnum::Center, 0),
+            TreeIndex(TreesEnum::First, 0),
+            TreeIndex(TreesEnum::Second, 0),
+            TreeIndex(TreesEnum::Third, 0)
+        ];
+        if !self.verify_valid_4th(&output) {
+            output.swap(0, 1);
+            if !self.verify_valid_4th(&output) {
+                output.swap(1, 2);
+            }
+        }
+        output
+    }
+
+    pub fn check_node_vis_cycle_org(&self, node_index: TreeIndex, cycle: &[TreeIndex]) -> Vec<TreeIndex> {
         let mut edges = vec![];
         for i in 0..cycle.len() - 1 {
             edges.push(Edge(self[cycle[i]].pos, self[cycle[i+1]].pos));
         }
         edges.push(Edge(self[*cycle.last().unwrap()].pos, self[*cycle.first().unwrap()].pos));
         edges.append(&mut self.get_all_edges());
+        self.check_node_vis_from_edge(node_index, edges)
+    }
+
+    pub fn check_node_vis_cycle(&self, node_index: TreeIndex, cycle: &[TreeIndex]) -> Vec<TreeIndex> {
+        let mut edges = vec![];
+        for i in 0..cycle.len() - 1 {
+            edges.push(Edge(self[cycle[i]].pos, self[cycle[i+1]].pos));
+        }
+        edges.push(Edge(self[*cycle.last().unwrap()].pos, self[*cycle.first().unwrap()].pos));
         self.check_node_vis_from_edge(node_index, edges)
     }
 

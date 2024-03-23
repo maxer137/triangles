@@ -15,5 +15,9 @@ impl Node {
     pub fn from_pos(x: f32, y: f32) -> Self {
         Node {pos: Point2::new(x, y)}
     }
+    
+    pub fn dist(&self, other: &Self) -> f32 {
+        self.pos.distance(other.pos)
+    }
 }
 
