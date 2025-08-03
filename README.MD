@@ -1,4 +1,4 @@
-# Triangles
+# Triangle graph generator
 
 This was an application that I quickly made to test with a project for a friend.
 
